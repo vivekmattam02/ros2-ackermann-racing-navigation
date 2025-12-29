@@ -1,48 +1,79 @@
-# Ackermann Narrow Corridor Navigation
+# ROS2 Ackermann Racing Navigation
 
 High-speed autonomous navigation for Ackermann-steered vehicles in narrow indoor corridors using ROS 2.
 
+## The Problem
+
+Indoor navigation in hospitals, warehouses, and office buildings requires robots to move through corridors as narrow as 1.2 meters. Existing solutions are either high-speed racers designed for wide tracks (3-5m) or slow conservative navigators that creep through spaces. Neither handles narrow corridors at useful speeds.
+
+This project bridges that gap.
+
 ## Overview
 
-This project develops a complete navigation framework for an Ackermann RC car operating in corridors as narrow as 1.2 meters. The system combines racing line optimization, camera-LiDAR perception, and MPPI control to achieve efficient high-speed navigation in constrained environments.
+We develop a complete navigation framework for an Ackermann RC car targeting corridor widths of 1.2-1.5 meters. The system combines racing line optimization, camera-LiDAR perception, and MPPI control. All development follows a simulation-first approach using Gazebo Ignition before hardware deployment.
 
 ## Key Features
 
-- **Custom Ackermann Simulation**: Complete URDF model with Gazebo Ignition integration
-- **Racing Line Optimization**: Outside-inside-outside cornering using 92% of corridor width
-- **Camera-LiDAR Fusion**: Optical flow with ego-motion compensation for obstacle velocity estimation
-- **Full Nav2 Integration**: SLAM Toolbox, EKF localization, MPPI controller
+- **Custom Ackermann Simulation**: Complete URDF model solving the four-bar linkage problem, integrated with Gazebo Ignition and ros2_control
+- **Racing Line Optimization**: Outside-inside-outside cornering geometry using 92% of corridor width for smoother, faster turns
+- **Camera-LiDAR Fusion**: Optical flow with ego-motion compensation for estimating obstacle velocity relative to the robot
+- **Full Nav2 Integration**: SLAM Toolbox for mapping, EKF for sensor fusion, MPPI controller with Ackermann motion model
 
 ## System Architecture
 
 ```
-Gazebo Simulation → ros_gz_bridge → Localization (EKF + SLAM) 
-                                   ↓
-                          Perception (Camera + LiDAR)
-                                   ↓
-                          Nav2 (Racing Line + MPPI)
-                                   ↓
-                          Ackermann Steering Controller
+┌─────────────────────────────────────────────────────────────────┐
+│                     Gazebo Ignition Simulation                  │
+│  (Ackermann Physics, 90° LiDAR, Camera, IMU)                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        ros_gz_bridge                            │
+│  (Sensor topics, TF, Clock synchronization)                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   Localization Layer    │     │    Perception Layer     │
+│  (EKF 50Hz + SLAM 2Hz)  │     │  (Camera-LiDAR Fusion)  │
+└─────────────────────────┘     └─────────────────────────┘
+              │                               │
+              └───────────────┬───────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Nav2 Navigation Stack                          │
+│  (Racing Line Planner, MPPI Controller, Costmaps)              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Ackermann Steering Controller (100Hz)              │
+│  (ros2_control, differential steering angles)                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
 
-- **ROS 2**: Humble
-- **Simulator**: Gazebo Ignition Fortress
-- **Navigation**: Nav2, SLAM Toolbox
-- **Control**: MPPI, ros2_control
-- **Perception**: OpenCV, optical flow
-- **Languages**: Python, C++
+| Component | Technology |
+|-----------|------------|
+| Framework | ROS 2 Humble |
+| Simulator | Gazebo Ignition Fortress |
+| Navigation | Nav2, SLAM Toolbox |
+| Localization | robot_localization (EKF) |
+| Control | MPPI, ros2_control |
+| Perception | OpenCV (Farneback optical flow) |
+| Languages | Python, C++ |
 
 ## Quick Start
 
 ### Prerequisites
-```bash
-# ROS 2 Humble
-# Gazebo Ignition Fortress
-# Nav2
-# SLAM Toolbox
-```
+- ROS 2 Humble
+- Gazebo Ignition Fortress
+- Nav2
+- SLAM Toolbox
+- robot_localization
 
 ### Build
 ```bash
@@ -53,10 +84,10 @@ source install/setup.bash
 
 ### Run Simulation
 ```bash
-# Launch full system
+# Terminal 1: Launch full system
 ./launch_rc_demo.sh
 
-# In another terminal - teleoperation
+# Terminal 2: Teleoperation
 ./teleop_rc.sh
 ```
 
@@ -65,28 +96,53 @@ source install/setup.bash
 ```
 NCHSB/
 ├── src/
-│   ├── rc_model_description/    # URDF, worlds, launch files
-│   ├── rc_nav_bridge/           # TwistStamper node
-│   └── rc_racing_planner/       # Racing line planner
-├── config/                      # Nav2, SLAM, EKF configs
-├── launch_rc_demo.sh           # Main launch script
-└── teleop_rc.sh                # Teleoperation script
+│   ├── rc_model_description/     # URDF, meshes, worlds, launch files
+│   │   ├── urdf/                 # Ackermann URDF/XACRO files
+│   │   ├── worlds/               # Narrow corridor SDF world
+│   │   ├── config/               # Controller, EKF, SLAM configs
+│   │   └── launch/               # Bringup launch files
+│   ├── rc_nav_bridge/            # TwistStamper node for Ackermann
+│   └── rc_racing_planner/        # Racing line global planner
+├── launch_rc_demo.sh             # Main launch script
+├── teleop_rc.sh                  # Teleoperation script
+└── stamper_bridge.sh             # TwistStamped converter
 ```
 
 ## Hardware Platform
 
-**Target**: Traxxas RC Car
-- Width: 0.28m
-- Wheelbase: 0.1869m
-- Min turn radius: 0.35m
+**Target Platform**: Traxxas RC Car with Ackermann Steering
+
+| Parameter | Value |
+|-----------|-------|
+| Width | 0.28m |
+| Wheelbase | 0.1869m |
+| Front Track | 0.137m |
+| Rear Track | 0.145m |
+| Wheel Radius | 0.055m |
+| Max Steering Angle | ±28° |
+| Min Turn Radius | 0.35m (theoretical) |
+
+## System Specifications
+
+| Component | Specification |
+|-----------|---------------|
+| EKF Update Rate | 50 Hz |
+| SLAM Resolution | 0.05 m/cell |
+| MPPI Samples | 2000 trajectories |
+| MPPI Horizon | 2.8s (56 timesteps) |
+| Ackermann Controller | 100 Hz |
+| Perception Processing | 20-25 fps |
+| Total ROS2 Nodes | 60+ |
 
 ## Team
 
-- **Nishant Pushparaju** - Path Planning
-- **Vivekananda Swamy Mattam** - Perception & Integration
-- **Samyu Kamtam** - Control Systems
+| Name | Role |
+|------|------|
+| Nishant Pushparaju | Control Systems |
+| Vivekananda Swamy Mattam | Perception and Integration |
+| Samyu Kamtam | Path Planning |
 
-**Affiliation**: NYU Tandon School of Engineering  
+**Affiliation**: NYU Tandon School of Engineering, Department of Mechanical and Aerospace Engineering  
 **Funding**: Bell Labs
 
 ## Citation
@@ -107,4 +163,4 @@ MIT License - see LICENSE file for details
 
 ## Acknowledgments
 
-Special thanks to Dr. Aliasghar Arab for project guidance.
+Special thanks to Dr. Aliasghar Arab for project guidance and technical mentorship throughout the development period.
