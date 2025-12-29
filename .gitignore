@@ -1,0 +1,40 @@
+# ROS Build Artifacts
+build/
+install/
+log/
+devel/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (local notes)
+notes/
+*.pdf
+PERCEPTION_STACK.md
+PROJECT_DESCRIPTION.txt
+INSTALL_APT_PACKAGES.txt
+RUN_COMMANDS.txt
+runCommands.txt
+chatgpt.txt
+error_documentation.txt
+
+# Temporary files
+*.bag
+*.db3
+*.gv
+sim_ws/
